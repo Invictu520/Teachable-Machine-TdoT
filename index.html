@@ -239,7 +239,7 @@
       model = await tmImage.load(modelURL, metadataURL);
       maxPredictions = model.getTotalClasses();
 
-      webcam = new tmImage.Webcam(450, 450, true);
+      webcam = new tmImage.Webcam(450, 450, false, true);
       await webcam.setup();
       await webcam.play();
       isInitialized = true;
