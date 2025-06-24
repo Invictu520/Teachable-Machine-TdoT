@@ -228,67 +228,80 @@
       "default": { bgColor: "#FFFFFF", textColor: "#172b4d", barColor: "#0052CC" }
     };
 
-    let model, webcam, labelContainer, maxPredictions;
-    let isInitialized = false;
-    let detectionActive = false;
+let model, webcam, labelContainer, maxPredictions;
+let isInitialized = false;
+let detectionActive = false;
 
-    async function init() {
-      if (isInitialized) return;
-      const modelURL = URL + "model.json";
-      const metadataURL = URL + "metadata.json";
-      model = await tmImage.load(modelURL, metadataURL);
-      maxPredictions = model.getTotalClasses();
+async function init() {
+  if (isInitialized) return;
 
-      webcam = new tmImage.Webcam(450, 450, false); 
-      
-      await webcam.setup({ video: { facingMode: "environment" } });
-      await webcam.play();
-      isInitialized = true;
+  const modelURL = URL + "model.json";
+  const metadataURL = URL + "metadata.json";
+  model = await tmImage.load(modelURL, metadataURL);
+  maxPredictions = model.getTotalClasses();
 
-      document.getElementById("status").style.display = 'none';
-      document.getElementById("start-button").style.display = 'inline-block';
+  // 1. Setup any camera temporarily to unlock device labels
+  webcam = new tmImage.Webcam(450, 450, false);
+  await webcam.setup();  // grants permission
+  await webcam.play();
 
-      const webcamContainer = document.getElementById("webcam-container");
-      webcamContainer.style.display = 'block';
-      webcamContainer.appendChild(webcam.canvas);
+  // 2. Now enumerate devices
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const videoDevices = devices.filter(d => d.kind === "videoinput");
+  let backCamera = videoDevices.find(d => d.label.toLowerCase().includes("back") || d.label.toLowerCase().includes("rear"));
 
-      labelContainer = document.getElementById("label-container");
+  if (backCamera) {
+    // 3. Stop temporary camera and switch to rear
+    await webcam.stop();
+    webcam = new tmImage.Webcam(450, 450, false);
+    await webcam.setup({ video: { deviceId: backCamera.deviceId } });
+    await webcam.play();
+  }
 
-      for (const classList of Object.values(classGroups)) {
-        for (const className of classList) {
-          const item = document.createElement("div");
-          item.classList.add("prediction-item");
-          item.dataset.className = className;
+  isInitialized = true;
 
-          const name = document.createElement("div");
-          name.classList.add("class-name");
+  document.getElementById("status").style.display = 'none';
+  document.getElementById("start-button").style.display = 'inline-block';
+  document.getElementById("toggle-camera-button").style.display = 'inline-block';
 
-          const barContainer = document.createElement("div");
-          barContainer.classList.add("progress-bar-container");
+  const webcamContainer = document.getElementById("webcam-container");
+  webcamContainer.style.display = 'block';
+  webcamContainer.innerHTML = '';
+  webcamContainer.appendChild(webcam.canvas);
 
-          const bar = document.createElement("div");
-          bar.classList.add("progress-bar");
+  labelContainer = document.getElementById("label-container");
 
-          const text = document.createElement("div");
-          text.classList.add("bar-text");
-          text.textContent = "0%";
+  // [Your class rendering code stays unchanged...]
+  for (const classList of Object.values(classGroups)) {
+    for (const className of classList) {
+      const item = document.createElement("div");
+      item.classList.add("prediction-item");
+      item.dataset.className = className;
 
-          barContainer.appendChild(bar);
-          barContainer.appendChild(text);
-          item.appendChild(name);
-          item.appendChild(barContainer);
-          labelContainer.appendChild(item);
-        }
-      }
+      const name = document.createElement("div");
+      name.classList.add("class-name");
 
-      window.requestAnimationFrame(loop);
+      const barContainer = document.createElement("div");
+      barContainer.classList.add("progress-bar-container");
+
+      const bar = document.createElement("div");
+      bar.classList.add("progress-bar");
+
+      const text = document.createElement("div");
+      text.classList.add("bar-text");
+      text.textContent = "0%";
+
+      barContainer.appendChild(bar);
+      barContainer.appendChild(text);
+      item.appendChild(name);
+      item.appendChild(barContainer);
+      labelContainer.appendChild(item);
     }
+  }
 
-    async function loop() {
-      webcam.update();
-      if (detectionActive) await predict();
-      window.requestAnimationFrame(loop);
-    }
+  window.requestAnimationFrame(loop);
+}
+
 
     async function predict() {
       const prediction = await model.predict(webcam.canvas);
