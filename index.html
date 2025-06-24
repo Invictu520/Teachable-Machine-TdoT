@@ -240,9 +240,8 @@
       maxPredictions = model.getTotalClasses();
 
       webcam = new tmImage.Webcam(450, 450, false); 
+      
       await webcam.setup({ video: { facingMode: "environment" } });
-
-      await webcam.setup();
       await webcam.play();
       isInitialized = true;
 
