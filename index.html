@@ -2,9 +2,13 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Süßigkeiten-Scanner</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background-color: #f4f5f7;
@@ -12,12 +16,13 @@
       flex-direction: column;
       align-items: center;
       margin: 0;
-      padding: 20px;
+      padding: 10px;
       color: #172b4d;
     }
 
     h1 {
       color: #091e42;
+      text-align: center;
     }
 
     #status {
@@ -27,8 +32,8 @@
     }
 
     #start-button {
-      padding: 10px 20px;
-      font-size: 1em;
+      padding: 12px 24px;
+      font-size: 1.1em;
       font-weight: bold;
       margin-top: 10px;
       border: none;
@@ -36,30 +41,42 @@
       background-color: #0052cc;
       color: white;
       cursor: pointer;
-      display: none;
+      display: none; /* Will be shown by JavaScript when ready */
     }
 
     #webcam-container {
       border: 5px solid #fff;
       border-radius: 16px;
       box-shadow: 0 4px 8px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
-      margin-top: 20px;
-      display: none;
+      margin-top: 15px;
+      display: none; /* Will be shown by JavaScript when ready */
       overflow: hidden;
+      width: 100%;
+      max-width: 450px;
+      height: auto;
+      position: relative;
     }
 
-    #top3-wrapper {
-      margin-top: 20px;
+    #webcam-container > canvas {
+      width: 100% !important;
+      height: auto !important;
+      display: block; /* Prevents small gap under canvas */
+    }
+
+    #top3-wrapper, #others-wrapper {
+      margin-top: 15px;
       padding: 10px;
-      width: 450px;
+      width: 100%;
+      max-width: 450px;
       background-color: #ffffff;
       border-radius: 12px;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-      display: none;
+      display: none; /* Will be shown after clicking Start */
     }
 
-    #top3-wrapper h2 {
+    #top3-wrapper h2, #others-wrapper h2 {
       font-size: 1.1em;
+      margin-top: 5px;
       margin-bottom: 10px;
       color: #344563;
     }
@@ -78,13 +95,17 @@
       box-shadow: 0 1px 1px rgba(9, 30, 66, 0.25);
       transition: all 0.2s ease-in-out;
     }
+    .prediction-item:last-child {
+      margin-bottom: 0;
+    }
 
     .class-name {
-      font-size: 1.1em;
+      font-size: 1em;
       font-weight: 600;
       word-wrap: break-word;
       white-space: normal;
       flex-basis: 50%;
+      padding-right: 10px;
     }
 
     .progress-bar-container {
@@ -114,22 +135,7 @@
       font-weight: bold;
       color: #fff;
       z-index: 2;
-    }
-
-    #others-wrapper {
-      margin-top: 20px;
-      padding: 10px;
-      width: 450px;
-      background-color: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-      display: none;
-    }
-
-    #others-wrapper h2 {
-      font-size: 1.1em;
-      margin-bottom: 10px;
-      color: #344563;
+      line-height: 20px;
     }
 
     #others-container {
@@ -155,27 +161,17 @@
       justify-content: space-between;
       box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.1);
     }
-
+    
     @media (max-width: 600px) {
-      #top3-wrapper, #others-wrapper {
-        padding: 0 10px;
-        width: 100%;
-      }
-
-      .class-name {
-        font-size: 1em;
-      }
-
-      .prediction-item {
-        padding: 10px;
-        margin-bottom: 8px;
-      }
+        h1 {
+            font-size: 1.5em;
+        }
     }
   </style>
 </head>
 <body>
   <h1>Süßigkeiten-Scanner</h1>
-  <div id="status">Lade Modell und starte Kamera...</div>
+  <div id="status">Lade Modell...</div>
   <button id="start-button">Erkennung starten</button>
 
   <div id="webcam-container"></div>
@@ -198,6 +194,7 @@
 
   <script type="text/javascript">
     const URL = "https://teachablemachine.withgoogle.com/models/axWN3EeTK/";
+    // ... (classGroups and classStyles objects remain unchanged) ...
     const medals = ["🥇", "🥈", "🥉"];
 
     const classGroups = {
@@ -234,61 +231,76 @@
 
     async function init() {
       if (isInitialized) return;
-      const modelURL = URL + "model.json";
-      const metadataURL = URL + "metadata.json";
-      model = await tmImage.load(modelURL, metadataURL);
-      maxPredictions = model.getTotalClasses();
 
-      webcam = new tmImage.Webcam(200, 250, false);
-      await webcam.setup({facingMode: "environment"});
-      await webcam.play();
-      isInitialized = true;
+      try {
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
 
-      document.getElementById("status").style.display = 'none';
-      document.getElementById("start-button").style.display = 'inline-block';
+        // ====================================================================
+        // KORRIGIERTER TEIL: Webcam-Größe sicher und responsiv berechnen
+        // ====================================================================
+        // Berechne die verfügbare Breite. Wir nehmen die Fensterbreite minus 20px Padding.
+        const availableWidth = window.innerWidth - 40;
+        // Die Webcam-Größe ist die verfügbare Breite, aber nicht mehr als 450px.
+        const size = Math.min(availableWidth, 450);
+        
+        // Initialisiere die Webcam mit der berechneten, sicheren Größe.
+        webcam = new tmImage.Webcam(size, size, false); 
+        await webcam.setup({ facingMode: "environment" });
+        await webcam.play();
+        isInitialized = true;
 
-      const webcamContainer = document.getElementById("webcam-container");
-      webcamContainer.style.display = 'block';
-      webcamContainer.appendChild(webcam.canvas);
+        // --- Der Rest des Codes kann jetzt sicher ausgeführt werden ---
 
-      labelContainer = document.getElementById("label-container");
+        document.getElementById("status").style.display = 'none';
+        document.getElementById("start-button").style.display = 'inline-block';
 
-      for (const classList of Object.values(classGroups)) {
-        for (const className of classList) {
-          const item = document.createElement("div");
-          item.classList.add("prediction-item");
-          item.dataset.className = className;
+        const webcamContainer = document.getElementById("webcam-container");
+        webcamContainer.style.display = 'block';
+        webcamContainer.appendChild(webcam.canvas);
 
-          const name = document.createElement("div");
-          name.classList.add("class-name");
+        labelContainer = document.getElementById("label-container");
 
-          const barContainer = document.createElement("div");
-          barContainer.classList.add("progress-bar-container");
-
-          const bar = document.createElement("div");
-          bar.classList.add("progress-bar");
-
-          const text = document.createElement("div");
-          text.classList.add("bar-text");
-          text.textContent = "0%";
-
-          barContainer.appendChild(bar);
-          barContainer.appendChild(text);
-          item.appendChild(name);
-          item.appendChild(barContainer);
-          labelContainer.appendChild(item);
+        // ... (The rest of the init function remains unchanged) ...
+        for (const classList of Object.values(classGroups)) {
+          for (const className of classList) {
+            const item = document.createElement("div");
+            item.classList.add("prediction-item");
+            item.dataset.className = className;
+            const name = document.createElement("div");
+            name.classList.add("class-name");
+            const barContainer = document.createElement("div");
+            barContainer.classList.add("progress-bar-container");
+            const bar = document.createElement("div");
+            bar.classList.add("progress-bar");
+            const text = document.createElement("div");
+            text.classList.add("bar-text");
+            text.textContent = "0%";
+            barContainer.appendChild(bar);
+            barContainer.appendChild(text);
+            item.appendChild(name);
+            item.appendChild(barContainer);
+            labelContainer.appendChild(item);
+          }
         }
-      }
+        window.requestAnimationFrame(loop);
 
-      window.requestAnimationFrame(loop);
+      } catch (error) {
+          console.error("Fehler bei der Initialisierung:", error);
+          document.getElementById("status").textContent = "Fehler beim Laden des Modells.";
+      }
     }
 
     async function loop() {
+      if (!isInitialized) return;
       webcam.update();
       if (detectionActive) await predict();
       window.requestAnimationFrame(loop);
     }
 
+    // ... (predict function remains unchanged) ...
     async function predict() {
       const prediction = await model.predict(webcam.canvas);
       const sorted = prediction.sort((a, b) => b.probability - a.probability);
@@ -346,7 +358,5 @@
   </script>
 </body>
 </html>
-
-
 
 
