@@ -2,9 +2,14 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Süßigkeiten-Scanner</title>
   <style>
+    /* Stellt sicher, dass die Größenberechnung Padding und Border einschließt */
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background-color: #f4f5f7;
@@ -12,12 +17,13 @@
       flex-direction: column;
       align-items: center;
       margin: 0;
-      padding: 20px;
+      padding: 10px; /* Reduziertes Padding für mobile Ansicht */
       color: #172b4d;
     }
 
     h1 {
       color: #091e42;
+      text-align: center; /* Zentriert den Titel */
     }
 
     #status {
@@ -39,19 +45,32 @@
       display: none;
     }
 
+    /* NEU: Flexibler Webcam-Container */
     #webcam-container {
       border: 5px solid #fff;
       border-radius: 16px;
       box-shadow: 0 4px 8px rgba(9, 30, 66, 0.25), 0 0 1px rgba(9, 30, 66, 0.31);
-      margin-top: 20px;
+      margin-top: 15px;
       display: none;
       overflow: hidden;
+      width: 100%; /* Nimmt die volle Breite ein */
+      max-width: 450px; /* Aber nicht mehr als 450px */
+      height: auto; /* Höhe passt sich an */
+      position: relative;
     }
 
+    /* NEU: Sorgt dafür, dass der Canvas der Webcam sich an den Container anpasst */
+    #webcam-container > canvas {
+        width: 100% !important;
+        height: auto !important;
+    }
+
+
     #top3-wrapper {
-      margin-top: 20px;
+      margin-top: 15px;
       padding: 10px;
-      width: 450px;
+      width: 100%; /* Nimmt die volle Breite ein */
+      max-width: 450px; /* Aber nicht mehr als 450px */
       background-color: #ffffff;
       border-radius: 12px;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
@@ -60,6 +79,7 @@
 
     #top3-wrapper h2 {
       font-size: 1.1em;
+      margin-top: 5px; /* Weniger Abstand oben */
       margin-bottom: 10px;
       color: #344563;
     }
@@ -78,9 +98,12 @@
       box-shadow: 0 1px 1px rgba(9, 30, 66, 0.25);
       transition: all 0.2s ease-in-out;
     }
+    .prediction-item:last-child {
+      margin-bottom: 0; /* Entfernt den Abstand beim letzten Element */
+    }
 
     .class-name {
-      font-size: 1.1em;
+      font-size: 1em; /* Leicht verkleinert für bessere Passform */
       font-weight: 600;
       word-wrap: break-word;
       white-space: normal;
@@ -114,12 +137,14 @@
       font-weight: bold;
       color: #fff;
       z-index: 2;
+      line-height: 20px; /* Zentriert den Text vertikal */
     }
 
     #others-wrapper {
-      margin-top: 20px;
+      margin-top: 15px;
       padding: 10px;
-      width: 450px;
+      width: 100%; /* Nimmt die volle Breite ein */
+      max-width: 450px; /* Aber nicht mehr als 450px */
       background-color: #ffffff;
       border-radius: 12px;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
@@ -128,6 +153,7 @@
 
     #others-wrapper h2 {
       font-size: 1.1em;
+      margin-top: 5px; /* Weniger Abstand oben */
       margin-bottom: 10px;
       color: #344563;
     }
@@ -155,21 +181,12 @@
       justify-content: space-between;
       box-shadow: inset 0 0 1px rgba(0, 0, 0, 0.1);
     }
-
+    
+    /* Media Query bleibt wichtig für letzte Anpassungen */
     @media (max-width: 600px) {
-      #top3-wrapper, #others-wrapper {
-        padding: 0 10px;
-        width: 100%;
-      }
-
-      .class-name {
-        font-size: 1em;
-      }
-
-      .prediction-item {
-        padding: 10px;
-        margin-bottom: 8px;
-      }
+        h1 {
+            font-size: 1.5em; /* Titel auf mobilen Geräten etwas kleiner */
+        }
     }
   </style>
 </head>
@@ -239,15 +256,18 @@
       model = await tmImage.load(modelURL, metadataURL);
       maxPredictions = model.getTotalClasses();
 
-      webcam = new tmImage.Webcam(450, 450, false);
-      await webcam.setup({facingMode: "environment"});
+      // NEU: Dynamische Größe für die Webcam berechnen
+      const webcamContainer = document.getElementById("webcam-container");
+      // Wir nehmen die Breite des Containers als Basis für die Webcam-Größe
+      const size = webcamContainer.offsetWidth; 
+      webcam = new tmImage.Webcam(size, size, false); // Breite und Höhe sind jetzt dynamisch
+      await webcam.setup({ facingMode: "environment" });
       await webcam.play();
       isInitialized = true;
 
       document.getElementById("status").style.display = 'none';
       document.getElementById("start-button").style.display = 'inline-block';
 
-      const webcamContainer = document.getElementById("webcam-container");
       webcamContainer.style.display = 'block';
       webcamContainer.appendChild(webcam.canvas);
 
@@ -346,7 +366,6 @@
   </script>
 </body>
 </html>
-
 
 
 
